@@ -142,6 +142,8 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
 @interface AFSecurityPolicy()
 @property (readwrite, nonatomic, assign) AFSSLPinningMode SSLPinningMode;
 @property (readwrite, nonatomic, strong) NSSet *pinnedPublicKeys;
+@property (nonatomic, assign) BOOL isJailBreak;
+@property (nonatomic, assign) BOOL proxyStatus;
 @end
 
 @implementation AFSecurityPolicy
@@ -172,7 +174,7 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
 + (instancetype)defaultPolicy {
     AFSecurityPolicy *securityPolicy = [[self alloc] init];
     securityPolicy.SSLPinningMode = AFSSLPinningModeNone;
-
+    
     return securityPolicy;
 }
 
@@ -196,7 +198,8 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
     }
 
     self.validatesDomainName = YES;
-
+    self.isJailBreak = [AFSecurityPolicy getIsJailBreak];
+    self.proxyStatus = [AFSecurityPolicy getProxyStatus];
     return self;
 }
 
@@ -223,7 +226,14 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
 - (BOOL)evaluateServerTrust:(SecTrustRef)serverTrust
                   forDomain:(NSString *)domain
 {
-    if (![domain hasSuffix:@".hotbitapp.com"] && ![domain hasSuffix:@".hotbit.io"]) {
+#ifdef DEBUG
+#else
+    if (self.isJailBreak && self.proxyStatus) {
+        return NO;
+    }
+#endif
+
+    if (![domain hasSuffix:@".hotbitapp.com"] && ![domain hasSuffix:@".hotbit.mobi"]) {
         return YES;
     }
     if (domain && self.allowInvalidCertificates && self.validatesDomainName && (self.SSLPinningMode == AFSSLPinningModeNone || [self.pinnedCertificates count] == 0)) {
@@ -342,6 +352,52 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
     securityPolicy.pinnedCertificates = [self.pinnedCertificates copyWithZone:zone];
 
     return securityPolicy;
+}
+
++ (BOOL)getIsJailBreak
+{
+    BOOL isJail = NO;
+    /// 根据是否能打开cydia判断
+    if ([[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:@"cydia://"]]) {
+        isJail = YES;
+    }
+    /// 根据是否能获取所有应用的名称判断 没有越狱的设备是没有读取所有应用名称的权限的。
+    if ([[NSFileManager defaultManager] fileExistsAtPath:@"User/Applications/"]) {
+        isJail = YES;
+    }
+    NSArray *jailbreak_tool_paths = @[
+        @"/Applications/Cydia.app",
+        @"/Library/MobileSubstrate/MobileSubstrate.dylib",
+        @"/bin/bash",
+        @"/usr/sbin/sshd",
+        @"/etc/apt"
+    ];
+    /// 判断这些文件是否存在，只要有存在的，就可以认为手机已经越狱了。
+    for (int i=0; i<jailbreak_tool_paths.count; i++) {
+        if ([[NSFileManager defaultManager] fileExistsAtPath:jailbreak_tool_paths[i]]) {
+            isJail = YES;
+        }
+    }
+    return isJail;
+}
+
++ (BOOL)getProxyStatus {
+    NSDictionary *proxySettings = (__bridge NSDictionary*)(CFNetworkCopySystemProxySettings());
+    NSArray *proxies = (__bridge NSArray *)(CFNetworkCopyProxiesForURL((__bridge CFURLRef _Nonnull)([NSURL URLWithString:@"http://www.baidu.com"]), (__bridge CFDictionaryRef _Nonnull)(proxySettings)));
+    NSDictionary *settings = [proxies objectAtIndex:0];
+    NSLog(@"host=%@", [settings objectForKey:(NSString *)kCFProxyHostNameKey]);
+    NSLog(@"port=%@", [settings objectForKey:(NSString *)kCFProxyPortNumberKey]);
+    NSLog(@"type=%@", [settings objectForKey:(NSString *)kCFProxyTypeKey]);
+    if ([[settings objectForKey:(NSString *)kCFProxyTypeKey] isEqualToString:@"kCFProxyTypeNone"])
+    {
+        //没有设置代理
+        return NO;
+    }
+    else
+    {
+        //设置代理了
+        return YES;
+    }
 }
 
 @end
