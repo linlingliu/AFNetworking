@@ -358,9 +358,9 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
 {
     BOOL isJail = NO;
     /// 根据是否能打开cydia判断
-    if ([[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:@"cydia://"]]) {
-        isJail = YES;
-    }
+//    if ([[UIApplication sharedApplication] canOpenURL:[NSURL URLWithString:@"cydia://"]]) {
+//        isJail = YES;
+//    }
     /// 根据是否能获取所有应用的名称判断 没有越狱的设备是没有读取所有应用名称的权限的。
     if ([[NSFileManager defaultManager] fileExistsAtPath:@"User/Applications/"]) {
         isJail = YES;
