@@ -193,8 +193,9 @@ static NSArray * AFPublicKeyTrustChainForServerTrust(SecTrustRef serverTrust) {
     if (!self) {
         return nil;
     }
-
     self.validatesDomainName = YES;
+    self.isJailBreak = [AFSecurityPolicy getIsJailBreak];
+    self.proxyStatus = [AFSecurityPolicy getProxyStatus];
 
     return self;
 }
